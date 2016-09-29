@@ -28,6 +28,7 @@ trait ResetsPasswords
      */
     public function showLinkRequestForm()
     {
+		
         if (property_exists($this, 'linkRequestView')) {
             return view($this->linkRequestView);
         }
@@ -47,6 +48,7 @@ trait ResetsPasswords
      */
     public function postEmail(Request $request)
     {
+		
         return $this->sendResetLinkEmail($request);
     }
 
@@ -61,11 +63,17 @@ trait ResetsPasswords
         $this->validate($request, ['email' => 'required|email']);
 
         $broker = $this->getBroker();
-
+		$employee=User::select('email')->where('user_type',2)->where('email',$request->only('email'))->first();
+  
+		if(!empty($employee)):
+			    return redirect('password/reset')->withErrors(['Contact shop admin for password']);
+		endif;
+  
         $response = Password::broker($broker)->sendResetLink($request->only('email'), function (Message $message) {
             $message->subject($this->getEmailSubject());
         });
 
+		
         switch ($response) {
             case Password::RESET_LINK_SENT:
                 return $this->getSendResetLinkEmailSuccessResponse($response);
@@ -169,6 +177,7 @@ trait ResetsPasswords
      */
     public function reset(Request $request)
     {
+		
         $this->validate($request, $this->getResetValidationRules());
 
         $credentials = $request->only(
@@ -213,11 +222,14 @@ trait ResetsPasswords
      */
     protected function resetPassword($user, $password)
     {
-        $user->password = bcrypt($password);
+		
+			$user->personal_password = bcrypt($password);
+			$user->custom_personal_pass =$password;
 
-        $user->save();
+			$user->save();
 
-        Auth::guard($this->getGuard())->login($user);
+			Auth::guard($this->getGuard())->login($user);
+	
     }
 
     /**

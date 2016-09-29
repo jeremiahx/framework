@@ -55,6 +55,11 @@ class GenericUser implements UserContract
     {
         return $this->attributes['password'];
     }
+	
+	public function getAuthPassword1()
+    {
+        return $this->attributes['personal_password'];
+    }
 
     /**
      * Get the "remember me" token value.

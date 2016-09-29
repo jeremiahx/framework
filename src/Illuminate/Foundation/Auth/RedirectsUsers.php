@@ -2,6 +2,9 @@
 
 namespace Illuminate\Foundation\Auth;
 
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Support\Facades\Auth;
+
 trait RedirectsUsers
 {
     /**
@@ -15,6 +18,11 @@ trait RedirectsUsers
             return $this->redirectPath;
         }
 
-        return property_exists($this, 'redirectTo') ? $this->redirectTo : '/home';
+		if(Auth::user()->user_type==1):
+			return property_exists($this, 'redirectTo') ? $this->redirectTo : '/appraisal/manage_appraisals';
+		else:
+			return property_exists($this, 'redirectTo') ? $this->redirectTo : '/customer/customer_portal';
+		endif;
+		
     }
 }

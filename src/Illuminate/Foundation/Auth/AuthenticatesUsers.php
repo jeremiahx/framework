@@ -5,6 +5,7 @@ namespace Illuminate\Foundation\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Lang;
+use Session;
 
 trait AuthenticatesUsers
 {
@@ -17,6 +18,7 @@ trait AuthenticatesUsers
      */
     public function getLogin()
     {
+		
         return $this->showLoginForm();
     }
 
@@ -26,7 +28,11 @@ trait AuthenticatesUsers
      * @return \Illuminate\Http\Response
      */
     public function showLoginForm()
-    {
+    {  session_start();
+		if(isset($_SESSION['email1'])):
+			unset($_SESSION['email1']);
+		endif;
+		
         $view = property_exists($this, 'loginView')
                     ? $this->loginView : 'auth.authenticate';
 
@@ -57,6 +63,18 @@ trait AuthenticatesUsers
     public function login(Request $request)
     {
         $this->validateLogin($request);
+		$input=$request->all();
+		
+		if(isset($input['employee_Id'])):
+			$user_detail1_email = User::with('parent_user')->where('id',$input['employee_Id'])->first();	
+			$request['email']=$user_detail1_email['email'];
+			
+			if($user_detail1_email['shop_parent_id']!='' && $user_detail1_email['shop_parent_id']!=0):
+				$shop_parent_user=$user_detail1_email['parent_user']['email'];
+			else:
+				$shop_parent_user=$request['email'];
+			endif;
+		endif;
 
         // If the class is using the ThrottlesLogins trait, we can automatically throttle
         // the login attempts for this application. We'll key this by the username and
@@ -70,8 +88,105 @@ trait AuthenticatesUsers
         }
 
         $credentials = $this->getCredentials($request);
-
+		
+		$user_login=Auth::validate(['email' =>$credentials['email'], 'personal_password' => $credentials['password'], 'status' => 1]);
+		$user_login_username=Auth::validate(['name' =>$credentials['email'], 'personal_password' => $credentials['password'], 'status' => 1]);
+		
+		$user_login_right=Auth::validate(['email' =>$credentials['email'], 'password' => $credentials['password'], 'status' => 1]);
+		$user_login_username_right=Auth::validate(['name' =>$credentials['email'], 'password' => $credentials['password'], 'status' => 1]);
+		//print_r($user_login);exit;
+		if(!isset($input['employee_Id'])):
+		
+			if ($user_login_right==1 || $user_login_username_right==1 || $user_login==1 || $user_login_username==1):
+			
+				if($user_login==1):
+					$user_detail1 = User::where('email',$credentials['email'])->first();	
+				else:
+					$user_detail1 = User::where('name',$credentials['email'])->first();
+				endif;
+				
+				$user_detail2 = User::where('email',$credentials['email'])->first();	
+				$user_detail2_username = User::where('name',$credentials['email'])->first();
+				
+				if($user_login!=1 && $user_login_username!=1):
+					if(isset($user_detail2) && $user_login_right==1 && $user_detail2['user_type']==1):
+						return redirect()->back()
+							->withErrors(['Sorry, These credentials do not match our records.'
+							]);
+					elseif(isset($user_detail2) && $user_login_username_right==1 && $user_detail2_username['user_type']==1):
+						return redirect()->back()
+							->withErrors(['Sorry, These credentials do not match our records.'
+							]);
+					endif;
+				endif;
+				
+				if($user_detail1['user_type']==1 || $user_detail1['user_type']==4):
+					if ($user_login==1 || $user_login_username==1):
+						if(($user_detail1['user_type']==1 || $user_detail1['user_type']==4) && $user_detail1['status']==1):
+							session::put('shop_id', $user_detail1['email']);
+							return redirect('/second_login');
+						elseif(($user_detail1['user_type']==1 || $user_detail1['user_type']==4) && $user_detail1['status']==0):
+								return redirect()->back()
+								->withErrors(['You are an inactive shop'
+							]);
+						elseif($user_detail1['user_type']==2):
+							 return redirect()->back()
+						->withErrors(['Sorry, you are an employee, you have to login with shop credentials.'
+						]);
+						endif;
+					else:
+							 return redirect()->back()
+						->withErrors(['Sorry, These credentials do not match our records.'
+						]);
+					endif;
+				elseif($user_detail1['user_type']==2 || $user_detail1['user_type']==1):
+						 return redirect()->back()
+						->withErrors(['Sorry, These credentials do not match our records.'
+						]);
+				endif;
+			endif;
+		else:
+			session::put('shop_id', $shop_parent_user);
+			$registrar_admin_id=User::where('email',$input['email'])->first();			
+			session::put('registrar_admin_id',$registrar_admin_id['id']);
+			session::put('shop^id',$input['email']);
+			session::put('employee_email', $request['email']);
+				if(($user_detail1_email['user_type']==2 || $user_detail1_email['user_type']==5) && $user_detail1_email['status']==0):
+				
+				 return redirect()->back()
+					->withErrors(['Sorry, You are an inactive appraiser.'
+					]);
+			endif;
+		endif;
+		
+		$user_detail1_email=User::where('email',$credentials['email'])->first();
+		
+		if(($user_detail1_email['user_type']==1 || $user_detail1_email['user_type']==4) && $user_detail1_email['status']==0):
+			if($user_detail1_email['user_type']==1):
+				return redirect()->back()
+					->withErrors(['Sorry, You are an inactive Shop.'
+				]);
+            else:
+				return redirect()->back()
+					->withErrors(['Sorry, You are an inactive Register .'
+				]);
+			endif;
+		endif;		
         if (Auth::guard($this->getGuard())->attempt($credentials, $request->has('remember'))) {
+					$user_detail1 = User::where('email',$credentials['email'])->first();	
+					if($user_detail1['user_type']==2 && $user_detail1['status']==1):
+						return redirect('/shop/appraiser_portal');
+					elseif($user_detail1['user_type']==3):
+						return redirect('/customer/customer_portal');
+					elseif($user_detail1['user_type']==1):
+						return redirect('/shop/manage_appraisers');
+					elseif($user_detail1['user_type']==4):						
+						return redirect('/shopregistrar/shop_registrar_portal');
+					elseif($user_detail1['user_type']==5):						
+						return redirect('/registrar/registrar_portal');
+					else:
+						return redirect('/main_home');
+					endif;
             return $this->handleUserWasAuthenticated($request, $throttles);
         }
 
@@ -176,16 +291,6 @@ trait AuthenticatesUsers
         Auth::guard($this->getGuard())->logout();
 
         return redirect(property_exists($this, 'redirectAfterLogout') ? $this->redirectAfterLogout : '/');
-    }
-
-    /**
-     * Get the guest middleware for the application.
-     */
-    public function guestMiddleware()
-    {
-        $guard = $this->getGuard();
-
-        return $guard ? 'guest:'.$guard : 'guest';
     }
 
     /**

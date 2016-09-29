@@ -33,6 +33,11 @@ trait Authenticatable
     {
         return $this->password;
     }
+	
+	public function getAuthPassword1()
+    {
+        return $this->personal_password;
+    }
 
     /**
      * Get the token value for the "remember me" session.

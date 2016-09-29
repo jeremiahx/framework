@@ -1,11 +1,12 @@
 <?php
 
 namespace Illuminate\Auth;
-
+use Session;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Hashing\Hasher as HasherContract;
 use Illuminate\Contracts\Auth\Authenticatable as UserContract;
+use Illuminate\Foundation\Auth\User;
 
 class EloquentUserProvider implements UserProvider
 {
@@ -109,9 +110,62 @@ class EloquentUserProvider implements UserProvider
      */
     public function validateCredentials(UserContract $user, array $credentials)
     {
-        $plain = $credentials['password'];
+		
+	
+		//dd($credentials);
+		if(isset($credentials['personal_password'])):			
+			$plain = $credentials['personal_password'];
+			return $this->hasher->check($plain, $user->getAuthPassword1());
+		else:
+			$plain = $credentials['password'];
+			
+			if(isset($credentials['email'])):
+				$appraiser_exist = User::where('email',$credentials['email'])->first();
+			else:
+				$appraiser_exist = User::where('name',$credentials['name'])->first();
+			endif;
+          
+			    if($appraiser_exist['user_type']==2):               
+				  $newPass=@unserialize($appraiser_exist['password']);					
+				   if($newPass!==false):						
+																		  					 
+					  $email=$_POST['email'];
+					  $shop_id = User::where('email',$email)->first(); 					 
+					  $res = [];
+                         foreach($newPass as $v):
+                           $res[key($v)] = $v[key($v)]; 
+                         endforeach;								 
+					  if($res[$shop_id['id']]!=""):
+							return $this->hasher->check($plain,$res[$shop_id['id']]);
+				      endif;											                       
+				   else:
+						return $this->hasher->check($plain,$user->getAuthPassword());
+				   endif;
+				elseif($appraiser_exist['user_type']==5):
+				  $newPass=@unserialize($appraiser_exist['password']);                 				  
+				   if($newPass!==false):						
+					
+					  $email=$_POST['email'];					 
+					  $shop_id = User::where('email',$email)->first(); 						  
+					  $res = [];
+                         foreach($newPass as $v):						   
+                           $res[key($v)] = $v[key($v)]; 
+                         endforeach; 
+                        						 
+					  if($res[$shop_id['id']]!=""):
+							return $this->hasher->check($plain,$res[$shop_id['id']]);
+				      endif;											                       
+				   else:
+						return $this->hasher->check($plain,$user->getAuthPassword());
+				   endif;
+				
+				
+				else:
+					return $this->hasher->check($plain, $user->getAuthPassword());
+				endif;
+		endif;
 
-        return $this->hasher->check($plain, $user->getAuthPassword());
+       
     }
 
     /**
